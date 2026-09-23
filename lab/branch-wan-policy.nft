@@ -1,0 +1,28 @@
+#!/usr/sbin/nft -f
+# Network performance lab: Network 2, branch router BR-RTR-01
+# Time-based restriction of non-critical cloud-backup traffic.
+# Uplink = 20 Mbps.  Office-hours allowance for backup = 5% = 1 Mbps = 125 kbytes/s.
+
+table inet BRANCH_WAN_POLICY {
+    set BACKUP_HOSTS {
+        type ipv4_addr
+        comment "cloud-backup agents at the branch site"
+        elements = { 10.20.0.50 }
+    }
+
+    chain FORWARD {
+        type filter hook forward priority filter; policy accept;
+
+        # ---------- PRODUCTION RULE ----------
+        # 09:00-17:00: cloud backup to the data centre is policed to 5% of the uplink.
+        ip saddr @BACKUP_HOSTS ip daddr 10.30.0.0/30 meta hour "09:00"-"17:00" limit rate over 125 kbytes/second burst 20 kbytes counter drop comment "BACKUP-CAP-OFFICE-HOURS-5PCT"
+
+        # ---------- LAB VERIFICATION RULE ----------
+        # Identical policer with the time match removed so the control can be
+        # evidenced outside 09:00-17:00. Remove before production cut-over.
+        ip saddr @BACKUP_HOSTS ip daddr 10.30.0.0/30 limit rate over 125 kbytes/second burst 20 kbytes counter drop comment "BACKUP-CAP-LAB-VERIFY-5PCT"
+
+        # Business application traffic is never policed.
+        ip saddr 10.20.0.0/24 ip daddr 10.30.0.0/30 counter comment "BUSINESS-TRAFFIC-PERMIT"
+    }
+}

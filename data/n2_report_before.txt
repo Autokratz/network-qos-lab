@@ -1,0 +1,6 @@
+Gi0-0 is up, line protocol is up
+  MTU 1500 bytes, BW 20000 Kbit/sec, sampling window 5 sec
+  reliability 255/255, txload 255/255, rxload 21/255
+  5 second input  rate 1651689 bits/sec  (8.3% of link)
+  5 second output rate 20014716 bits/sec  (100.1% of link)
+  output errors 0, output drops 0

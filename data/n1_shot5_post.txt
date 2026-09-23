@@ -1,0 +1,76 @@
+===== NETWORK 1 : POST-OPTIMISATION VERIFICATION (same bulk load offered) =====
+Voice marked DSCP EF (0xb8) and policed into priority class 1:10 across bond0
+
+VOIP-PHONE-10# ping -Q 0xb8 -c 40 -i 0.5 10.10.8.2   (EF-marked voice path)
+PING 10.10.8.2 (10.10.8.2) 56(84) bytes of data.
+64 bytes from 10.10.8.2: icmp_seq=1 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=2 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=3 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=4 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=5 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=6 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=7 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=8 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=9 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=10 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=11 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=12 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=13 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=14 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=15 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=16 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=17 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=18 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=19 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=20 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=21 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=22 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=23 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=24 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=25 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=26 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=27 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=28 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=29 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=30 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=31 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=32 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=33 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=34 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=35 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=36 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=37 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=38 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=39 ttl=62 time=20.0 ms
+64 bytes from 10.10.8.2: icmp_seq=40 ttl=62 time=20.0 ms
+
+--- 10.10.8.2 ping statistics ---
+40 packets transmitted, 40 received, 0% packet loss, time 19519ms
+rtt min/avg/max/mdev = 20.022/20.029/20.039/0.005 ms
+
+VOIP-PHONE-10# iperf3 -c 10.10.8.2 -u -b 1M -S 184  (RTP-equivalent, EF marked)
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bitrate         Jitter    Lost/Total Datagrams
+[  5]   0.00-35.00  sec  4.17 MBytes  1.00 Mbits/sec  0.000 ms  0/25437 (0%)  sender
+[  5]   0.00-35.22  sec  4.17 MBytes   994 Kbits/sec  0.002 ms  0/25437 (0%)  receiver
+
+iperf Done.
+
+ACC-SW-01# tc -s class show dev bond0                 (per-class service counters)
+class htb 1:10 parent 1:1 leaf 10: prio 0 rate 5Mbit ceil 20Mbit burst 8Kb cburst 1600b
+ Sent 5447484 bytes 25478 pkt (dropped 0, overlimits 0 requeues 0) 
+ backlog 0b 0p requeues 0
+ lended: 25478 borrowed: 0 giants: 0
+ tokens: 199450 ctokens: 8662
+
+class htb 1:1 root rate 20Mbit ceil 20Mbit burst 1600b cburst 1600b
+ Sent 113707421 bytes 97043 pkt (dropped 0, overlimits 8213 requeues 0) 
+ backlog 0b 0p requeues 0
+ lended: 8212 borrowed: 0 giants: 0
+ tokens: 9587 ctokens: 9587
+
+class htb 1:20 parent 1:1 leaf 20: prio 1 rate 15Mbit ceil 20Mbit burst 1600b cburst 1600b
+ Sent 108259937 bytes 71565 pkt (dropped 75, overlimits 36543 requeues 0) 
+ backlog 0b 0p requeues 0
+ lended: 30177 borrowed: 8212 giants: 0
+ tokens: 12784 ctokens: 9587

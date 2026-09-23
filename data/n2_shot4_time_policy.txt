@@ -1,0 +1,30 @@
+===== NETWORK 2 : TIME-BASED BANDWIDTH THROTTLING (CLOUD BACKUP) =====
+Uplink 20 Mbps.  Office-hours cap for backup host 10.20.0.50 = 1 Mbps (5%)
+
+BR-RTR-01# nft list ruleset
+table inet BRANCH_WAN_POLICY {
+	set BACKUP_HOSTS {
+		type ipv4_addr
+		comment "cloud-backup agents at the branch site"
+		elements = { 10.20.0.50 }
+	}
+
+	chain FORWARD {
+		type filter hook forward priority filter; policy accept;
+		ip saddr @BACKUP_HOSTS ip daddr 10.30.0.0/30 meta hour "09:00"-"17:00" limit rate over 125 kbytes/second burst 20 kbytes counter packets 0 bytes 0 drop comment "BACKUP-CAP-OFFICE-HOURS-5PCT"
+		ip saddr @BACKUP_HOSTS ip daddr 10.30.0.0/30 limit rate over 125 kbytes/second burst 20 kbytes counter packets 0 bytes 0 drop comment "BACKUP-CAP-LAB-VERIFY-5PCT"
+		ip saddr 10.20.0.0/24 ip daddr 10.30.0.0/30 counter packets 0 bytes 0 comment "BUSINESS-TRAFFIC-PERMIT"
+	}
+}
+
+BR-RTR-01# tc class show dev wg0
+class htb 1:1 root rate 20Mbit ceil 20Mbit burst 1600b cburst 1600b
+class htb 1:20 parent 1:1 prio 2 rate 1Mbit ceil 1Mbit burst 1600b cburst 1600b
+class htb 1:30 parent 1:1 prio 1 rate 19Mbit ceil 20Mbit burst 1600b cburst 1600b
+
+BR-RTR-01# tc filter show dev wg0
+filter parent 1: protocol ip pref 1 u32 chain 0 
+filter parent 1: protocol ip pref 1 u32 chain 0 fh 800: ht divisor 1 
+filter parent 1: protocol ip pref 1 u32 chain 0 fh 800::800 order 2048 key ht 800 bkt 0 flowid 1:20 not_in_hw 
+  match 0a140032/ffffffff at 12
+

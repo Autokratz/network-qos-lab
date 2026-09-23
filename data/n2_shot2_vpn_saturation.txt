@@ -1,0 +1,47 @@
+===== NETWORK 2 : BRANCH WAN / SITE-TO-SITE VPN - MIDDAY CLOUD SYNC =====
+Device: BR-RTR-01   WAN Gi0-0 (20 Mbps)   Tunnel wg0 -> HQ 203.0.113.2
+
+BR-RTR-01# wan-load-report Gi0-0 20000 5      (live counters -> IOS-style load)
+Gi0-0 is up, line protocol is up
+  MTU 1500 bytes, BW 20000 Kbit/sec, sampling window 5 sec
+  reliability 255/255, txload 255/255, rxload 21/255
+  5 second input  rate 1651689 bits/sec  (8.3% of link)
+  5 second output rate 20014716 bits/sec  (100.1% of link)
+  output errors 0, output drops 0
+
+BR-RTR-01# ip -s link show dev Gi0-0          (WAN interface statistics)
+7: Gi0-0@if6: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc htb state UP mode DEFAULT group default qlen 1000
+    link/ether e2:d4:aa:9f:6d:d4 brd ff:ff:ff:ff:ff:ff link-netnsid 3
+    RX:  bytes packets errors dropped  missed   mcast           
+       2855524   20262      0       0       0       0 
+    TX:  bytes packets errors dropped carrier collsns           
+      46861112   31438      0       0       0       0 
+
+BR-RTR-01# wg show                            (site-to-site tunnel status/volume)
+interface: wg0
+  public key: jxozOSUj6lYrodavRUBDs7ZljBN22alGI4bjcrNdHlM=
+  private key: (hidden)
+  listening port: 51820
+
+peer: EmBJ21jqGGASPB5fnIpNYxmMwaTWkj7MFtHbn3AgIUo=
+  endpoint: 203.0.113.2:51820
+  allowed ips: 10.30.0.0/30, 172.16.10.2/32
+  latest handshake: 26 seconds ago
+  transfer: 1.91 MiB received, 46.69 MiB sent
+  persistent keepalive: every 25 seconds
+
+BR-RTR-01# ip -s link show dev wg0            (tunnel interface statistics)
+4: wg0: <POINTOPOINT,NOARP,UP,LOWER_UP> mtu 1420 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000
+    link/none 
+    RX:  bytes packets errors dropped  missed   mcast           
+       2004976   20258      0       0       0       0 
+    TX:  bytes packets errors dropped carrier collsns           
+      47851952   33019      0     772       0       0 
+
+WRK-PC-60# ping -c 30 10.30.0.2               (staff app response during the sync)
+
+--- 10.30.0.2 ping statistics ---
+30 packets transmitted, 29 received, 3.33333% packet loss, time 14523ms
+rtt min/avg/max/mdev = 199.229/712.974/1208.492/360.286 ms, pipe 3
+
+PEAK WAN EGRESS = 100.7% of 20 Mbps  --> UPLINK SATURATED BY BACKUP TRAFFIC
