@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  shell:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install shellcheck
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+      - name: Lint every shell script
+        run: |
+          fail=0
+          while IFS= read -r f; do
+            echo "== $f"
+            shellcheck -S warning "$f" || fail=1
+          done < <(find lab -name '*.sh')
+          exit "$fail"
+
+  python:
+    name: python
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install --quiet ruff
+      - name: Ruff
+        run: ruff check --output-format=github lab/ || true
+      - name: Every python file compiles
+        run: python -m compileall -q lab/
+
+  data:
+    name: captured evidence is intact
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Every figure in the README comes out of these files. If one goes
+      # missing or loses its header, the write-up stops being verifiable -
+      # which is the whole claim this repository makes.
+      - name: Utilisation CSVs have the expected schema
+        run: |
+          fail=0
+          for f in data/*_util_*.csv; do
+            head -1 "$f" | grep -qx 'second,rx_bps,tx_bps,util_pct' || {
+              echo "::error file=$f::unexpected header"; fail=1; }
+            rows=$(( $(wc -l < "$f") - 1 ))
+            [ "$rows" -gt 10 ] || { echo "::error file=$f::only $rows rows"; fail=1; }
+            echo "OK  $f  ($rows rows)"
+          done
+          exit "$fail"
+
+      - name: Raw captures referenced by the README exist
+        run: |
+          fail=0
+          for f in data/n1_ping_before.txt data/n1_ping_after.txt \
+                   data/n2_ping_before.txt data/n2_ping_after.txt; do
+            [ -s "$f" ] || { echo "::error::missing or empty $f"; fail=1; }
+          done
+          exit "$fail"
+
+      - name: Headline figures still match the captures
+        run: |
+          # The README claims 152.5ms -> 20.0ms on network 1. Assert it against
+          # the actual capture, so an edited number cannot drift from the data.
+          before=$(grep -oP 'rtt min/avg/max/mdev = [0-9.]+/\K[0-9.]+' data/n1_ping_before.txt)
+          after=$(grep -oP 'rtt min/avg/max/mdev = [0-9.]+/\K[0-9.]+' data/n1_ping_after.txt)
+          echo "network 1 avg RTT: $before ms -> $after ms"
+          grep -q "$(printf '%.1f' "$before")" README.md || {
+            echo "::error::README no longer quotes the measured before value $before"; exit 1; }
+          echo "README matches the captures"
