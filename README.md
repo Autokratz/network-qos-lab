@@ -121,6 +121,24 @@ Engineering credibility comes from stating the limits of your own measurements, 
 
 ---
 
+## Prerequisites
+
+```bash
+sudo apt install iproute2 iperf3 wireguard-tools nftables util-linux
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+```
+
+Kernel modules: `bonding`, `bridge`, `veth`, `ifb`. All ship with a stock
+Ubuntu or Debian kernel.
+
+**On Ubuntu 24.04 and newer**, unprivileged user namespaces are restricted by
+AppArmor and `unshare` fails with `Operation not permitted`. Either run the
+labs with `sudo`, or lift the restriction for the session:
+
+```bash
+sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+```
+
 ## Reproducing
 
 ```bash

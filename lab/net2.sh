@@ -69,7 +69,7 @@ insh HQ "printf '%s' '$HQKEY' | wg set wg0 private-key /dev/stdin listen-port 51
 insh HQ "ip addr add 172.16.10.2/30 dev wg0 && ip link set wg0 up && \
          ip route add 10.20.0.0/24 dev wg0"
 
-insh CLD "iperf3 -s -D -p 5201"; insh CLD "iperf3 -s -D -p 5202"
+start_iperf CLD 5201; start_iperf CLD 5202
 sleep 2
 VPN_UP=0
 for _try in $(seq 1 12); do

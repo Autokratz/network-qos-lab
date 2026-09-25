@@ -8,15 +8,23 @@ DATA="$BASE/data"
 mkdir -p "$OUT" "$DATA"
 
 declare -A NSPID
+declare -a IPERF_PIDFILES
 
 # Create a named network namespace backed by a sleeping holder process.
 mkns() {
   local n=$1
   unshare --net -- sleep 100000 &
   NSPID[$n]=$!
-  # wait for the namespace to exist
+  # Wait for the namespace, then say so if it never appeared. Returning
+  # success with a dead PID made every later step fail somewhere else.
   local i=0
   while [ ! -e "/proc/${NSPID[$n]}/ns/net" ] && [ $i -lt 50 ]; do sleep 0.05; i=$((i+1)); done
+  if [ ! -e "/proc/${NSPID[$n]}/ns/net" ]; then
+    echo "mkns: namespace '$n' never appeared." >&2
+    echo "  On Ubuntu 24.04+ unprivileged user namespaces are restricted:" >&2
+    echo "  sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0" >&2
+    return 1
+  fi
 }
 
 # Run a command inside a named namespace
@@ -41,6 +49,17 @@ ctr() { # ctr <ns> <if>  -> "rxbytes txbytes"
   insh "$1" "ip -s link show dev $2" | awk '/^ *RX:/{getline; rx=$1} /^ *TX:/{getline; tx=$1} END{print rx+0, tx+0}'
 }
 
+# Servers started with `iperf3 -s -D` daemonise inside their namespace and are
+# not children of this shell, so killing the holder alone orphaned them.
+start_iperf() { # start_iperf <ns> <port>
+  insh "$1" "iperf3 -s -D -p $2 --pidfile /tmp/iperf-$1-$2.pid"
+  IPERF_PIDFILES+=("/tmp/iperf-$1-$2.pid")
+}
+
 cleanup_all() {
+  for f in "${IPERF_PIDFILES[@]:-}"; do
+    [ -f "$f" ] && kill "$(cat "$f")" 2>/dev/null
+    rm -f "$f"
+  done
   for p in "${NSPID[@]}"; do kill "$p" 2>/dev/null; done
 }

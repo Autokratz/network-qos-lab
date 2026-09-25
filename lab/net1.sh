@@ -60,7 +60,7 @@ UPLINK_BPS=10000000
 insh ACC  "tc qdisc add dev Gi0-1 root tbf rate 10mbit burst 32kb latency 120ms"
 insh CORE "tc qdisc add dev Gi1-1 root tbf rate 10mbit burst 32kb latency 120ms"
 
-insh SRV "iperf3 -s -D -p 5201" ; insh SRV "iperf3 -s -D -p 5202"
+start_iperf SRV 5201; start_iperf SRV 5202
 sleep 1
 insh VOIP "ping -c 2 -W 3 10.10.8.2" >/dev/null 2>&1 || { echo "[net1] FATAL: no path"; exit 1; }
 echo "[net1] topology up."

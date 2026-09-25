@@ -1,0 +1,4 @@
+# Only lab/render.py and lab/make_screenshots.py need these. The lab scripts
+# themselves (net1.sh, net2.sh) have no Python dependencies.
+matplotlib>=3.7
+Pillow>=10.0

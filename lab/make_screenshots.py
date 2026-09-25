@@ -44,7 +44,7 @@ print("[render] composites...")
 R.build(1,
         "SCREENSHOT 1  -  NETWORK 1: TRAFFIC CONGESTION & HIGH LINK UTILISATION",
         f"ACC-SW-01 Gi0-1 uplink saturated at {peak1:.1f}% of 10 Mbps; tail-drop buffer overflowing; "
-        f"voice RTT {sum(b)/len(b):.0f} ms average",
+        f"voice RTT {(sum(b)/len(b) if b else 0):.0f} ms average",
         p("n1_shot1_congestion.txt"), "ACC-SW-01 - console (peak hour)",
         [o(".c1.png")])
 
@@ -63,25 +63,28 @@ R.build(3,
 
 R.build(4,
         "SCREENSHOT 4  -  NETWORK 2: TIME-BASED BANDWIDTH THROTTLING / POLICY",
-        "Time-based ACL (09:00-17:00) capping cloud backup at 5% of the 20 Mbps uplink, with matching class-based shaper",
+        f"Time-based ACL ({R.POLICER_WINDOW[0]:02d}:00-{R.POLICER_WINDOW[1]:02d}:00) capping cloud backup "
+        "at 5% of the 20 Mbps uplink, with matching class-based shaper",
         p("n2_shot4_time_policy.txt"), "BR-RTR-01 - console (traffic policy)",
         [])
 
 R.build(5,
         "SCREENSHOT 5  -  NETWORK 1: POST-OPTIMISATION LATENCY & PACKET LOSS",
-        f"VoIP RTT reduced from {sum(b)/len(b):.0f} ms to {sum(a)/len(a):.0f} ms under the same bulk load, 0% packet loss",
+        f"VoIP RTT reduced from {(sum(b)/len(b) if b else 0):.0f} ms to "
+        f"{(sum(a)/len(a) if a else 0):.0f} ms under the same bulk load, 0% packet loss",
         p("n1_shot5_post.txt"), "VOIP-PHONE-10 / ACC-SW-01 - console (verification)",
         [o(".c5.png")])
 
-day = [v for h, v in prof.items() if 8 <= h <= 19]
+day = [v for h, v in prof.items() if R.WORKING_DAY[0] <= h <= R.WORKING_DAY[1]]
 R.build(6,
         "SCREENSHOT 6  -  NETWORK 2: POST-OPTIMISATION DAYTIME BANDWIDTH RECOVERY",
-        f"Business-hours WAN load back to {sum(day)/len(day):.1f}% average; heavy backup traffic confined to the 22:00-05:00 window",
+        f"Working-day WAN load back to {(sum(day)/len(day) if day else 0):.1f}% average; "
+        f"heavy backup traffic confined to the 22:00-05:00 window",
         p("n2_shot6_recovery.txt"), "BR-RTR-01 - console (business hours)",
         [o(".c6b.png"), o(".c6a.png")])
 
 for f in os.listdir(O):
-    if f.startswith("."):
+    if f.startswith(".c") and f.endswith(".png"):
         os.remove(o(f))
 
 print("[render] done ->", O)

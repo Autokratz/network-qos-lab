@@ -17,6 +17,12 @@ import matplotlib.pyplot as plt
 from PIL import Image, ImageDraw, ImageFont
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Two different windows, previously both called "business hours":
+#   POLICER_WINDOW is when branch-wan-policy.nft actually caps the backup
+#   WORKING_DAY is the span the 24-hour average is reported over
+POLICER_WINDOW = (9, 17)
+WORKING_DAY = (8, 19)
+
 DATA = os.path.join(BASE, "data")
 OUT = os.path.join(BASE, "out")
 os.makedirs(OUT, exist_ok=True)
@@ -25,8 +31,22 @@ FONT_CANDIDATES = [
     "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf",
 ]
-MONO = next(p for p in FONT_CANDIDATES if os.path.exists(p))
+# next() with no default raises StopIteration at IMPORT time when
+# fonts-dejavu-core is absent, which is a confusing way to learn you are
+# missing a package. None means "ask PIL for its own default".
+MONO = next((p for p in FONT_CANDIDATES if os.path.exists(p)), None)
 MONO_B = FONT_CANDIDATES[1] if os.path.exists(FONT_CANDIDATES[1]) else MONO
+
+
+def mono(path, size):
+    """A monospace face at the given size, or PIL's own if DejaVu is absent.
+
+    The screenshots look better with DejaVu, but a missing font package should
+    degrade the output, not stop the module importing.
+    """
+    if path is None:
+        return ImageFont.load_default()
+    return ImageFont.truetype(path, size)
 
 BG = (12, 15, 18)
 FG = (216, 222, 233)
@@ -88,8 +108,8 @@ def condense(text, keep_head=6, keep_tail=2):
 
 def render_terminal(text, title, width_px=None):
     text = condense(text)
-    font = ImageFont.truetype(MONO, FS)
-    bold = ImageFont.truetype(MONO_B, FS)
+    font = mono(MONO, FS)
+    bold = mono(MONO_B, FS)
     ch_w = font.getbbox("M")[2] - font.getbbox("M")[0]
     ch_h = FS + 6
 
@@ -199,13 +219,13 @@ def chart_latency(before, after, png):
     xb = [i * 0.5 for i in range(len(b))]
     xa = [i * 0.5 for i in range(len(a))]
     ax.plot(xb, b, color="#ff5f56", linewidth=1.8,
-            label=f"before QoS - avg {sum(b)/len(b):.1f} ms")
+            label=f"before QoS - avg {(sum(b)/len(b) if b else 0):.1f} ms")
     ax.plot(xa, a, color="#7ee08a", linewidth=1.8,
             label=f"after QoS (DSCP EF) - avg {sum(a)/len(a):.1f} ms")
     ax.axhline(150, color="#ffbd2e", linestyle="--", linewidth=1.1)
     ax.text(0.99, 0.93, "150 ms ITU-T G.114 one-way voice budget",
             transform=ax.transAxes, ha="right", color="#ffbd2e", fontsize=8)
-    ax.set_ylim(0, max(max(b), 170) * 1.15)
+    ax.set_ylim(0, max(max(b, default=0), 170) * 1.15)
     ax.set_xlabel("elapsed time (seconds)")
     ax.set_ylabel("VoIP RTT (ms)")
     ax.set_title("Network 1 - voice path latency, identical bulk load offered",
@@ -227,12 +247,15 @@ def chart_24h(csv_path, png):
     order = sorted(range(len(hours)), key=lambda i: hours[i])
     hours = [hours[i] for i in order]
     util = [util[i] for i in order]
-    colours = ["#4c8dff" if 8 <= h <= 19 else "#ff9f43" for h in hours]
+    colours = [
+        "#4c8dff" if WORKING_DAY[0] <= h <= WORKING_DAY[1] else "#ff9f43"
+        for h in hours
+    ]
     fig, ax = plt.subplots(figsize=(10.4, 3.6), dpi=100)
     dark_axes(ax, fig)
     ax.bar(hours, util, color=colours, width=0.75)
     ax.axvspan(7.6, 19.4, color="#4c8dff", alpha=0.08)
-    ax.text(13.5, 92, "business hours 08:00-19:00", color="#8fb6ff",
+    ax.text(13.5, 92, f"working day {WORKING_DAY[0]:02d}:00-{WORKING_DAY[1]:02d}:00", color="#8fb6ff",
             fontsize=9, ha="center")
     ax.text(2, 92, "scheduled backup window", color="#ffb877", fontsize=9,
             ha="center")
@@ -264,8 +287,8 @@ def stack(paths, out_png, gap=10):
 
 
 def caption(text, width, sub=None):
-    font = ImageFont.truetype(MONO_B, 17)
-    small = ImageFont.truetype(MONO, 13)
+    font = mono(MONO_B, 17)
+    small = mono(MONO, 13)
     h = 62 if sub else 40
     img = Image.new("RGB", (width, h), (18, 22, 27))
     d = ImageDraw.Draw(img)

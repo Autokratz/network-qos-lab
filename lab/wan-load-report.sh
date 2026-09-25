@@ -20,7 +20,7 @@ awk -v rx0="$RX0" -v tx0="$TX0" -v rx1="$RX1" -v tx1="$TX1" -v s="$SECS" \
   rbps=(rx1-rx0)*8/s; tbps=(tx1-tx0)*8/s; cap=bw*1000;
   rl=rbps/cap*255; tl=tbps/cap*255;
   if (rl>255) rl=255; if (tl>255) tl=255;
-  printf "%s is up, line protocol is %s\n", ifc, (st=="UP"?"up":tolower(st));
+  printf "%s is %s, line protocol is %s\n", ifc, (st=="UP"?"up":"down"), (st=="UP"?"up":tolower(st));
   printf "  MTU 1500 bytes, BW %d Kbit/sec, sampling window %d sec\n", bw, s;
   printf "  reliability 255/255, txload %d/255, rxload %d/255\n", tl+0.5, rl+0.5;
   printf "  %d second input  rate %d bits/sec  (%.1f%% of link)\n", s, rbps, rbps/cap*100;
