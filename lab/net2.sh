@@ -6,14 +6,17 @@ set -u
 
 # shellcheck source=lab/common.sh
 source "$(dirname "$0")/common.sh"
-trap cleanup_all EXIT
+
+# The key directory is torn down by the trap, not at the end of the script.
+# A failed step or a Ctrl-C left the WireGuard private keys on disk.
+KD=$(mktemp -d)
+trap 'cleanup_all; rm -rf "$KD"' EXIT
 
 LOG2="$DATA/n2_shot2_vpn_saturation.txt"
 LOG4="$DATA/n2_shot4_time_policy.txt"
 LOG6="$DATA/n2_shot6_recovery.txt"
 : > "$LOG2"; : > "$LOG4"; : > "$LOG6"
 LOG="$LOG2"
-KD=$(mktemp -d)
 
 
 WAN_KBPS=20000
@@ -50,22 +53,31 @@ done
 # ---------------------------------------------------------------- IPsec-equivalent site-to-site VPN (WireGuard)
 echo "[net2] bringing up site-to-site VPN tunnel..."
 umask 077
-# keys are fed on stdin: the AppArmor policy that covers unprivileged user
-# namespaces on this host denies wg(8) read access to ordinary key files.
-BRKEY=$(wg genkey); BRPUB=$(printf '%s' "$BRKEY" | wg pubkey)
-HQKEY=$(wg genkey); HQPUB=$(printf '%s' "$HQKEY" | wg pubkey)
+# Keys reach wg(8) on stdin, because the AppArmor policy covering unprivileged
+# user namespaces on this host denies it read access to ordinary key files.
+#
+# They are redirected in from $KD rather than interpolated into the command
+# string: insh runs `nsenter ... bash -c "<string>"`, so a key placed in that
+# string is a process argument, and every private key in this lab was readable
+# in `ps` for the life of the tunnel. Only the path is an argument now. $KD
+# is a mktemp -d directory, which is 0700 by construction, and the umask
+# above makes the key files inside it 0600. Both are removed on exit.
+wg genkey > "$KD/br.key"
+wg genkey > "$KD/hq.key"
+BRPUB=$(wg pubkey < "$KD/br.key")
+HQPUB=$(wg pubkey < "$KD/hq.key")
 
 insh BR "ip link add wg0 type wireguard"
-insh BR "printf '%s' '$BRKEY' | wg set wg0 private-key /dev/stdin listen-port 51820 \
+insh BR "wg set wg0 private-key /dev/stdin listen-port 51820 \
             peer $HQPUB allowed-ips 10.30.0.0/30,172.16.10.2/32 \
-            endpoint 203.0.113.2:51820 persistent-keepalive 25"
+            endpoint 203.0.113.2:51820 persistent-keepalive 25 < $KD/br.key"
 insh BR "ip addr add 172.16.10.1/30 dev wg0 && ip link set wg0 up && \
          ip route add 10.30.0.0/30 dev wg0"
 
 insh HQ "ip link add wg0 type wireguard"
-insh HQ "printf '%s' '$HQKEY' | wg set wg0 private-key /dev/stdin listen-port 51820 \
+insh HQ "wg set wg0 private-key /dev/stdin listen-port 51820 \
             peer $BRPUB allowed-ips 10.20.0.0/24,172.16.10.1/32 \
-            endpoint 203.0.113.1:51820 persistent-keepalive 25"
+            endpoint 203.0.113.1:51820 persistent-keepalive 25 < $KD/hq.key"
 insh HQ "ip addr add 172.16.10.2/30 dev wg0 && ip link set wg0 up && \
          ip route add 10.20.0.0/24 dev wg0"
 
@@ -209,8 +221,7 @@ for h in $(seq 0 23); do
   insh $SRC "iperf3 -c 10.30.0.2 -p $PORT -u -b $RATE -t 2 --forceflush" >/dev/null 2>&1
   read -r _ t1 < <(ctr BR Gi0-0)
   BPS=$(( (t1-t0)*8/2 ))
-  echo "$h,$BPS,$(awk -v a=$BPS -v r=$WAN_BPS 'BEGIN{printf "%.1f",(a/r)*100}')" >> "$DATA/n2_24h_profile.csv"
+  echo "$h,$BPS,$(awk -v a="$BPS" -v r="$WAN_BPS" 'BEGIN{printf "%.1f",(a/r)*100}')" >> "$DATA/n2_24h_profile.csv"
 done
 
-rm -rf "$KD"
 echo "[net2] done."
