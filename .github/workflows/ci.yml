@@ -36,7 +36,7 @@ jobs:
           python-version: "3.12"
       - run: pip install --quiet ruff
       - name: Ruff
-        run: ruff check --output-format=github lab/ || true
+        run: ruff check --output-format=github lab/
       - name: Every python file compiles
         run: python -m compileall -q lab/
 
@@ -77,6 +77,22 @@ jobs:
           before=$(grep -oP 'rtt min/avg/max/mdev = [0-9.]+/\K[0-9.]+' data/n1_ping_before.txt)
           after=$(grep -oP 'rtt min/avg/max/mdev = [0-9.]+/\K[0-9.]+' data/n1_ping_after.txt)
           echo "network 1 avg RTT: $before ms -> $after ms"
-          grep -q "$(printf '%.1f' "$before")" README.md || {
-            echo "::error::README no longer quotes the measured before value $before"; exit 1; }
-          echo "README matches the captures"
+          fail=0
+          assert_quoted() { # assert_quoted <value> <label>
+            # the README quotes some figures to one decimal and some rounded,
+            # so accept either rendering of the measured value
+            grep -qF "$(printf '%.1f' "$1")" README.md && return
+            grep -qF "$(printf '%.0f' "$1")" README.md && return
+            echo "::error::README no longer quotes the measured $2 value $1"
+            fail=1
+          }
+          assert_quoted "$before" "network 1 before"
+          assert_quoted "$after"  "network 1 after"
+
+          n2b=$(grep -oP 'rtt min/avg/max/mdev = [0-9.]+/\K[0-9.]+' data/n2_ping_before.txt)
+          n2a=$(grep -oP 'rtt min/avg/max/mdev = [0-9.]+/\K[0-9.]+' data/n2_ping_after.txt)
+          echo "network 2 avg RTT: $n2b ms -> $n2a ms"
+          assert_quoted "$n2b" "network 2 before"
+          assert_quoted "$n2a" "network 2 after"
+
+          exit "$fail"

@@ -48,7 +48,9 @@ WKSTN-DATA-20 ─┘        10 Mbps uplink                    10 ms each way
 | VoIP packet loss | **0%** (ping) and 0 / 25,437 datagrams |
 | Voice class 1:10 counters | 25,478 packets sent, **0 dropped** |
 
-Latency fell **87%** while the same four-stream bulk transfer continued to run. The uplink still sits at roughly 99% utilisation — average throughput actually rose slightly. Nothing was throttled. Voice simply stopped sharing a queue with bulk data.
+Latency fell **87%** while the same four-stream bulk transfer continued to run.
+
+Both states read roughly 99% utilisation, but against different capacity: the before run measures a single 10 Mbps uplink, and the after run measures the 20 Mbps 802.3ad bond. The link is equally full in both, carrying about twice the traffic in the second. Nothing was throttled; voice stopped sharing a queue with bulk data.
 
 ---
 
