@@ -63,3 +63,19 @@ cleanup_all() {
   done
   for p in "${NSPID[@]}"; do kill "$p" 2>/dev/null; done
 }
+
+# Transcript helpers. Both append to $LOG, which each lab script sets after
+# sourcing this file; the value is read at call time, so a script may point
+# $LOG at a different file between phases.
+say() { echo "$*" >> "$LOG"; }
+
+# Echo a device prompt line, run the command in its namespace, and record
+# both in the transcript. Redirects are grouped so the file is opened once.
+cmd() { # cmd <ns> <prompt> <command string>
+  local ns=$1 host=$2; shift 2
+  {
+    echo "${host}# $*"
+    insh "$ns" "$*" 2>&1
+    echo
+  } >> "$LOG"
+}

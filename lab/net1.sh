@@ -5,6 +5,7 @@
 if [ -z "$LAB_NS" ]; then exec env LAB_NS=1 unshare -r --net --mount --fork "$0" "$@"; fi
 set -u
 
+# shellcheck source=lab/common.sh
 source "$(dirname "$0")/common.sh"
 trap cleanup_all EXIT
 
@@ -14,13 +15,6 @@ LOG5="$DATA/n1_shot5_post.txt"         # screenshot 5 transcript
 : > "$LOG1"; : > "$LOG3"; : > "$LOG5"
 LOG="$LOG1"
 
-say()  { echo "$*" >> "$LOG"; }
-cmd() { # cmd <ns> <prompt> <command string>
-  local ns=$1 host=$2; shift 2
-  echo "${host}# $*" >> "$LOG"
-  insh "$ns" "$*" >> "$LOG" 2>&1
-  echo >> "$LOG"
-}
 
 # ---------------------------------------------------------------- topology
 echo "[net1] building topology..."
@@ -74,7 +68,7 @@ sample() { # sample <ns> <if> <csv> <secs> <link_bps>
     sleep 1
     read -r crx ctx < <(ctr "$ns" "$ifc")
     local rb=$(( (crx-prx)*8 )) tb=$(( (ctx-ptx)*8 ))
-    echo "$t,$rb,$tb,$(awk -v a=$tb -v r=$rate 'BEGIN{printf "%.1f",(a/r)*100}')" >> "$f"
+    echo "$t,$rb,$tb,$(awk -v a="$tb" -v r="$rate" 'BEGIN{printf "%.1f",(a/r)*100}')" >> "$f"
     prx=$crx; ptx=$ctx
   done
 }
@@ -104,19 +98,20 @@ LOG="$LOG1"
 say "===== NETWORK 1 : ACCESS-SWITCH UPLINK - PEAK HOUR (09:00-11:00) ====="
 say "Device: ACC-SW-01  Uplink Gi0-1 -> CORE-SW-01 Gi1-1   Link rate: 10 Mbps"
 say ""
-echo "ACC-SW-01# tc -s qdisc show dev Gi0-1        (interface queue / drop counters)" >> "$LOG"
-echo "$CONG_QDISC" >> "$LOG"; echo >> "$LOG"
-echo "ACC-SW-01# ip -s link show dev Gi0-1         (interface error / drop statistics)" >> "$LOG"
-echo "$CONG_LINK" >> "$LOG"; echo >> "$LOG"
-echo "VOIP-PHONE-10# ping -c 40 -i 0.5 10.10.8.2   (voice path to server, unclassified)" >> "$LOG"
-cat "$DATA/n1_ping_before.txt" >> "$LOG"; echo >> "$LOG"
-echo "VOIP-PHONE-10# iperf3 -c 10.10.8.2 -u -b 1M  (RTP-equivalent stream, loss report)" >> "$LOG"
-tail -6 "$DATA/n1_voice_before.txt" >> "$LOG"; echo >> "$LOG"
+say "ACC-SW-01# tc -s qdisc show dev Gi0-1        (interface queue / drop counters)"
+say "$CONG_QDISC"; say ""
+say "ACC-SW-01# ip -s link show dev Gi0-1         (interface error / drop statistics)"
+say "$CONG_LINK"; say ""
+say "VOIP-PHONE-10# ping -c 40 -i 0.5 10.10.8.2   (voice path to server, unclassified)"
+cat "$DATA/n1_ping_before.txt" >> "$LOG"; say ""
+say "VOIP-PHONE-10# iperf3 -c 10.10.8.2 -u -b 1M  (RTP-equivalent stream, loss report)"
+tail -6 "$DATA/n1_voice_before.txt" >> "$LOG"; say ""
 say "PEAK EGRESS UTILISATION ON Gi0-1 = ${PEAK}% of 10 Mbps  --> LINK SATURATED"
 
 # ================================================================ PHASE B
 echo "[net1] PHASE B - EtherChannel + QoS..."
 for spec in "ACC Gi0-1 Gi0-2 10.10.9.1" "CORE Gi1-1 Gi1-2 10.10.9.2"; do
+  # shellcheck disable=SC2086  # deliberate: $spec is a space-separated field list
   set -- $spec; ns=$1; m1=$2; m2=$3; addr=$4
   insh "$ns" "tc qdisc del dev $m1 root" 2>/dev/null
   insh "$ns" "ip addr flush dev $m1; ip link set $m1 down; ip link set $m2 down"
@@ -173,11 +168,11 @@ LOG="$LOG5"
 say "===== NETWORK 1 : POST-OPTIMISATION VERIFICATION (same bulk load offered) ====="
 say "Voice marked DSCP EF (0xb8) and policed into priority class 1:10 across bond0"
 say ""
-echo "VOIP-PHONE-10# ping -Q 0xb8 -c 40 -i 0.5 10.10.8.2   (EF-marked voice path)" >> "$LOG"
-cat "$DATA/n1_ping_after.txt" >> "$LOG"; echo >> "$LOG"
-echo "VOIP-PHONE-10# iperf3 -c 10.10.8.2 -u -b 1M -S 184  (RTP-equivalent, EF marked)" >> "$LOG"
-tail -6 "$DATA/n1_voice_after.txt" >> "$LOG"; echo >> "$LOG"
-echo "ACC-SW-01# tc -s class show dev bond0                 (per-class service counters)" >> "$LOG"
-echo "$POST_CLASS" >> "$LOG"
+say "VOIP-PHONE-10# ping -Q 0xb8 -c 40 -i 0.5 10.10.8.2   (EF-marked voice path)"
+cat "$DATA/n1_ping_after.txt" >> "$LOG"; say ""
+say "VOIP-PHONE-10# iperf3 -c 10.10.8.2 -u -b 1M -S 184  (RTP-equivalent, EF marked)"
+tail -6 "$DATA/n1_voice_after.txt" >> "$LOG"; say ""
+say "ACC-SW-01# tc -s class show dev bond0                 (per-class service counters)"
+say "$POST_CLASS"
 
 echo "[net1] done."

@@ -4,6 +4,7 @@
 if [ -z "$LAB_NS" ]; then exec env LAB_NS=1 unshare -r --net --mount --fork "$0" "$@"; fi
 set -u
 
+# shellcheck source=lab/common.sh
 source "$(dirname "$0")/common.sh"
 trap cleanup_all EXIT
 
@@ -14,8 +15,6 @@ LOG6="$DATA/n2_shot6_recovery.txt"
 LOG="$LOG2"
 KD=$(mktemp -d)
 
-say() { echo "$*" >> "$LOG"; }
-cmd() { local ns=$1 host=$2; shift 2; echo "${host}# $*" >> "$LOG"; insh "$ns" "$*" >> "$LOG" 2>&1; echo >> "$LOG"; }
 
 WAN_KBPS=20000
 WAN_BPS=20000000
@@ -41,6 +40,7 @@ insh CLD "ip addr add 10.30.0.2/30 dev eth0 && ip route add default via 10.30.0.
 
 # WAN pipe: 20 Mbps each way with 15 ms provider latency
 for spec in "BR Gi0-0" "HQ Gi0-0"; do
+  # shellcheck disable=SC2086  # deliberate: $spec is a space-separated field list
   set -- $spec
   insh "$1" "tc qdisc add dev $2 root handle 1: htb default 10"
   insh "$1" "tc class add dev $2 parent 1: classid 1:10 htb rate 20mbit ceil 20mbit"
@@ -101,7 +101,7 @@ sample() { # sample <ns> <if> <csv> <secs> <link_bps>
     sleep 1
     read -r crx ctx < <(ctr "$ns" "$ifc")
     local rb=$(( (crx-prx)*8 )) tb=$(( (ctx-ptx)*8 ))
-    echo "$t,$rb,$tb,$(awk -v a=$tb -v r=$rate 'BEGIN{printf "%.1f",(a/r)*100}')" >> "$f"
+    echo "$t,$rb,$tb,$(awk -v a="$tb" -v r="$rate" 'BEGIN{printf "%.1f",(a/r)*100}')" >> "$f"
     prx=$crx; ptx=$ctx
   done
 }
@@ -128,16 +128,16 @@ LOG="$LOG2"
 say "===== NETWORK 2 : BRANCH WAN / SITE-TO-SITE VPN - MIDDAY CLOUD SYNC ====="
 say "Device: BR-RTR-01   WAN Gi0-0 (20 Mbps)   Tunnel wg0 -> HQ 203.0.113.2"
 say ""
-echo "BR-RTR-01# wan-load-report Gi0-0 20000 5      (live counters -> IOS-style load)" >> "$LOG"
-cat "$DATA/n2_report_before.txt" >> "$LOG"; echo >> "$LOG"
-echo "BR-RTR-01# ip -s link show dev Gi0-0          (WAN interface statistics)" >> "$LOG"
-echo "$WAN_STATS" >> "$LOG"; echo >> "$LOG"
-echo "BR-RTR-01# wg show                            (site-to-site tunnel status/volume)" >> "$LOG"
-echo "$WG_STATS" >> "$LOG"; echo >> "$LOG"
-echo "BR-RTR-01# ip -s link show dev wg0            (tunnel interface statistics)" >> "$LOG"
-echo "$WG_LINK" >> "$LOG"; echo >> "$LOG"
-echo "WRK-PC-60# ping -c 30 10.30.0.2               (staff app response during the sync)" >> "$LOG"
-tail -4 "$DATA/n2_ping_before.txt" >> "$LOG"; echo >> "$LOG"
+say "BR-RTR-01# wan-load-report Gi0-0 20000 5      (live counters -> IOS-style load)"
+cat "$DATA/n2_report_before.txt" >> "$LOG"; say ""
+say "BR-RTR-01# ip -s link show dev Gi0-0          (WAN interface statistics)"
+say "$WAN_STATS"; say ""
+say "BR-RTR-01# wg show                            (site-to-site tunnel status/volume)"
+say "$WG_STATS"; say ""
+say "BR-RTR-01# ip -s link show dev wg0            (tunnel interface statistics)"
+say "$WG_LINK"; say ""
+say "WRK-PC-60# ping -c 30 10.30.0.2               (staff app response during the sync)"
+tail -4 "$DATA/n2_ping_before.txt" >> "$LOG"; say ""
 say "PEAK WAN EGRESS = ${PEAK2}% of 20 Mbps  --> UPLINK SATURATED BY BACKUP TRAFFIC"
 
 # ================================================================ SHOT 4 : time-based policy
@@ -181,14 +181,14 @@ LOG="$LOG6"
 say "===== NETWORK 2 : DAYTIME BANDWIDTH RECOVERY (POLICY IN FORCE) ====="
 say "Backup relocated to the 22:00-05:00 window; office-hours attempts are policed to 5%"
 say ""
-echo "BR-RTR-01# wan-load-report Gi0-0 20000 5      (WAN load during business hours)" >> "$LOG"
-cat "$DATA/n2_report_after.txt" >> "$LOG"; echo >> "$LOG"
-echo "BR-RTR-01# nft list chain inet BRANCH_WAN_POLICY FORWARD   (policer hit counters)" >> "$LOG"
-echo "$NFT_CTRS" >> "$LOG"; echo >> "$LOG"
-echo "BR-RTR-01# tc -s class show dev wg0           (backup class held at 1 Mbps)" >> "$LOG"
-echo "$TC_AFTER" >> "$LOG"; echo >> "$LOG"
-echo "WRK-PC-60# ping -c 30 10.30.0.2               (staff app response, business hours)" >> "$LOG"
-tail -4 "$DATA/n2_ping_after.txt" >> "$LOG"; echo >> "$LOG"
+say "BR-RTR-01# wan-load-report Gi0-0 20000 5      (WAN load during business hours)"
+cat "$DATA/n2_report_after.txt" >> "$LOG"; say ""
+say "BR-RTR-01# nft list chain inet BRANCH_WAN_POLICY FORWARD   (policer hit counters)"
+say "$NFT_CTRS"; say ""
+say "BR-RTR-01# tc -s class show dev wg0           (backup class held at 1 Mbps)"
+say "$TC_AFTER"; say ""
+say "WRK-PC-60# ping -c 30 10.30.0.2               (staff app response, business hours)"
+tail -4 "$DATA/n2_ping_after.txt" >> "$LOG"; say ""
 
 # ---------------------------------------------------------------- accelerated 24-hour profile
 echo "[net2] PHASE D - accelerated 24-hour traffic profile (1 simulated hour = 2 s)..."
