@@ -22,7 +22,9 @@ jobs:
           fail=0
           while IFS= read -r f; do
             echo "== $f"
-            shellcheck -S warning "$f" || fail=1
+            # No -S filter. The style and info findings were real and are
+            # fixed; keeping the bar here stops them coming back.
+            shellcheck "$f" || fail=1
           done < <(find lab -name '*.sh')
           exit "$fail"
 
