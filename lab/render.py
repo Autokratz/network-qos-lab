@@ -11,6 +11,7 @@ import re
 import textwrap
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from PIL import Image, ImageDraw, ImageFont
@@ -55,7 +56,7 @@ def line_colour(line):
         if re.search(r"\b(dropped|drop|overlimits|errors)\b", low) and re.search(r"\b0\b\s*$", s):
             return FG
         return WARN
-    if s.startswith("#") or s.startswith("--"):
+    if s.startswith(("#", "--")):
         return DIM
     return FG
 
@@ -68,8 +69,8 @@ def condense(text, keep_head=6, keep_tail=2):
     def flush():
         if len(run) > keep_head + keep_tail + 1:
             out.extend(run[:keep_head])
-            out.append("            ... %d further replies omitted for brevity ..."
-                       % (len(run) - keep_head - keep_tail))
+            omitted = len(run) - keep_head - keep_tail
+            out.append(f"            ... {omitted} further replies omitted for brevity ...")
             out.extend(run[-keep_tail:])
         else:
             out.extend(run)
@@ -163,7 +164,7 @@ def chart_util(csv_path, title, ylabel, png, colour="#ff5f56", thresh=90,
     ax.annotate(f"peak {peak:.1f}%",
                 xy=(x[y.index(peak)], peak), xytext=(0.42, 0.72),
                 textcoords="axes fraction", color="#ffffff", fontsize=10,
-                arrowprops=dict(arrowstyle="->", color="#ffffff", lw=1.1))
+                arrowprops={"arrowstyle": "->", "color": "#ffffff", "lw": 1.1})
     if cap_label:
         ax.text(0.02, 0.88, cap_label, transform=ax.transAxes,
                 color="#7ee08a", fontsize=9)
@@ -235,7 +236,7 @@ def chart_24h(csv_path, png):
             fontsize=9, ha="center")
     ax.text(2, 92, "scheduled backup window", color="#ffb877", fontsize=9,
             ha="center")
-    ax.set_xticks(range(0, 24))
+    ax.set_xticks(range(24))
     ax.set_xlim(-0.7, 23.7)
     ax.set_ylim(0, max(105, max(util) * 1.08))
     ax.set_xlabel("hour of day (accelerated lab run: 1 simulated hour = 2 s of real traffic)")
@@ -275,7 +276,9 @@ def caption(text, width, sub=None):
 
 
 def build(shot, title, subtitle, term_file, term_title, charts):
-    term = render_terminal(open(term_file).read(), term_title)
+    with open(term_file, encoding="utf-8") as fh:
+        captured = fh.read()
+    term = render_terminal(captured, term_title)
     parts = []
     tmp = os.path.join(OUT, f".tmp_term_{shot}.png")
     term.save(tmp)
