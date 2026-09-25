@@ -24,7 +24,7 @@ jobs:
             echo "== $f"
             # No -S filter. The style and info findings were real and are
             # fixed; keeping the bar here stops them coming back.
-            shellcheck "$f" || fail=1
+            shellcheck -x "$f" || fail=1
           done < <(find lab -name '*.sh')
           exit "$fail"
 
